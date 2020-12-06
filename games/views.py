@@ -7,22 +7,26 @@ Publisher: Packt Publishing Ltd. - http://www.packtpub.com
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.utils import timezone
+from datetime import datetime
 from .models import Game
 from .serializers import GameSerializer
 
 
 @api_view(['GET','POST'])
 def game_list(request):
+	games = Game.objects.all()
 	if request.method == 'GET':
-		games = Game.objects.all()
 		games_serializer = GameSerializer(games, many=True)
 		return Response(games_serializer.data)
 	elif request.method == 'POST':
 		games_serializer = GameSerializer(data=request.data)
-		if games_serializer.is_valid():
+		games_name = [game.name for game in games]
+		game_name = request.data['name']
+		if games_serializer.is_valid() and game_name not in games_name:
 			games_serializer.save()
 			return Response(games_serializer.data, status=status.HTTP_201_CREATED)
-		return Response(games_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+		return Response({'error': 'The game already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET','PUT', 'POST', 'DELETE'])
@@ -36,13 +40,19 @@ def game_detail(request, pk):
 		games_serializer = GameSerializer(game)
 		return Response(games_serializer.data)
 
+
 	elif request.method == 'PUT':
 		games_serializer = GameSerializer(game, data=request.data)		
-		if games_serializer.is_valid():
+		games_name = [game.name for game in games]
+		game_name = request.data.name
+		if games_serializer.is_valid() and game_name not in games_name:
 			games_serializer.save()
 			return Response(games_serializer.data)
-		return Response(games_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+		return Response({'error': 'The game already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 	elif request.method == 'DELETE':
+		if game.release_date < timezone.make_aware(datetime.now()):
+			return Response({'error': 'The game has already been released'}, status=status.HTTP_400_BAD_REQUEST)
 		game.delete()
 		return Response(status=status.HTTP_204_NO_CONTENT)
